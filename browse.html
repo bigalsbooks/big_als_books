@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Browse | Big Al's Books</title>
+
+  <style>
+      html    {
+          background-image:url(bowex1/images/cozy_library.jpg)
+      }
+    body {
+        font-family: "Times New Roman", serif;
+        background-image:url(bowex1/images/paper.jpg);
+        color: #222;
+        max-width: 700px;
+        margin: 40px auto;
+        line-height: 1.6;
+        border: groove black 10px;
+        padding: 20px
+    }
+
+    .navbar {
+      background-color: #6c530c3b;
+      padding: 10px 20px;
+      margin-bottom: 30px;
+      display: flex;
+      gap: 20px;
+      border-bottom: 2px solid #000;
+    }
+
+    .navbar a {
+      text-decoration: none;
+      font-weight: bold;
+      color: #000;
+    }
+
+    .navbar a:hover {
+      text-decoration: underline;
+    }
+
+    .quote-item {
+      margin-bottom: 40px;
+      padding-left: 15px;
+      border-left: 4px solid #000;
+      font-style: italic;
+    }
+
+    .quote-meta {
+      margin-top: 5px;
+      font-style: normal;
+      font-size: 14px;
+    }
+
+    .vote-box {
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    .vote-box button {
+      font-family: "Times New Roman", serif;
+      border: 1px solid #000;
+      background: #eee;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav class="navbar">
+      <a href="index.html"><u>Home</u></a>
+      <a href="submission.html"><u>Submit a Quote</u></a>
+      <a href="browse.html"><u>Browse</u></a>
+  </nav>
+
+  <h1>Browse Submissions</h1>
+  <p>Please keep your comments respectful.</p>
+
+  <div id="quotes">Loading...</div>
+
+  
+  
+
+<!-- Firebase Libraries -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script type="module">
+  // --- Firebase imports ---
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+  import { 
+    getDatabase, 
+    ref, 
+    onValue,
+    push,
+    remove,
+    update
+  } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDTd0z-wb7mpe3r-HbU5NAokr0ROeqEwZg",
+    authDomain: "bigalsbookstore-a7c78.firebaseapp.com",
+    databaseURL: "https://bigalsbookstore-a7c78-default-rtdb.firebaseio.com",
+    projectId: "bigalsbookstore-a7c78",
+    appId: "1:643104294784:web:928d21e80cd49003dce365"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  const container = document.getElementById("quotes");
+  container.innerHTML = "Loading…";
+
+  // --- Helpers ---
+  function safe(text) {
+    return (text || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function formatDate(ts) {
+    if (!ts) return "";
+    const d = new Date(ts);
+    return d.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric"
+    });
+  }
+
+  function idForQuote(q) {
+    return btoa(
+      encodeURIComponent((q.quote || "") + (q.book || "") + (q.author || ""))
+    );
+  }
+
+  function looksLikeBot(text) {
+    const bad = /(http:|https:|www\.|viagra|casino|crypto|free money)/i;
+    if (!text) return false;
+    if (text.length > 500) return true;
+    return bad.test(text);
+  }
+
+  // --- Load quotes live ---
+  const quotesRef = ref(db, "quotes");
+
+  onValue(quotesRef, (snap) => {
+    const data = snap.val();
+    container.innerHTML = "";
+
+    if (!data) {
+      container.innerHTML = "No quotes yet.";
+      return;
+    }
+
+    const entries = Object.entries(data).reverse();
+
+    entries.forEach(([key, q]) => {
+      if (q.hidden) return;
+
+      const qDiv = document.createElement("div");
+      qDiv.className = "quote-item";
+
+      const qID = key;
+      const date = formatDate(q.timestamp);
+
+      qDiv.innerHTML = `
+        “${safe(q.quote)}”
+        <div class="quote-meta">
+          — ${safe(q.author || "Unknown")}, <em>${safe(q.book || "")}</em>
+          <br>submitted by ${safe(q.name || "Anonymous")}
+          ${date ? "<br><span style='font-size:12px;'>on " + date + "</span>" : ""}
+        </div>
+      `;
+
+      // --- Comments container ---
+      const commentsBox = document.createElement("div");
+      commentsBox.className = "comments-box";
+      commentsBox.style.display = "none";
+
+      // Toggle button
+      const toggle = document.createElement("button");
+      toggle.textContent = "▼ comments";
+      toggle.onclick = () => {
+        commentsBox.style.display =
+          commentsBox.style.display === "none" ? "block" : "none";
+      };
+
+      // --- Existing comments ---
+      const commentsRef = ref(db, `comments/${qID}`);
+      const commentsList = document.createElement("div");
+
+      onValue(commentsRef, (cSnap) => {
+        const cData = cSnap.val();
+        commentsList.innerHTML = "";
+
+        if (!cData) return;
+
+        Object.entries(cData).forEach(([cid, c]) => {
+          if (c.hidden) return;
+          const cDiv = document.createElement("div");
+          cDiv.className = "comment-item";
+          cDiv.innerHTML = `
+            <b>${safe(c.name || "Anon")}:</b> ${safe(c.text)}
+          `;
+
+          // --- Moderation (admin only via browser console) ---
+          cDiv.onclick = () => {
+            if (localStorage.getItem("isAdmin") === "true") {
+              if (confirm("Delete this comment?")) {
+                remove(ref(db, `comments/${qID}/${cid}`));
+              }
+            }
+          };
+
+          commentsList.appendChild(cDiv);
+        });
+      });
+
+      // --- Comment form ---
+      const form = document.createElement("div");
+      form.innerHTML = `
+        <input placeholder="Your name" style="width:95%;"><br>
+        <textarea placeholder="Write a comment…" style="width:95%;"></textarea>
+        <button>Post comment</button>
+        <div class="comment-status"></div>
+      `;
+
+      const nameInput = form.querySelector("input");
+      const textInput = form.querySelector("textarea");
+      const btn = form.querySelector("button");
+      const status = form.querySelector(".comment-status");
+
+      // --- Anti-spam delay ---
+      let lastPost = 0;
+
+      btn.onclick = () => {
+        const name = safe(nameInput.value.trim());
+        const text = safe(textInput.value.trim());
+
+        if (!text) return;
+
+        if (looksLikeBot(text)) {
+          status.textContent = "Blocked spam-like message.";
+          return;
+        }
+
+        const now = Date.now();
+        if (now - lastPost < 8000) {
+          status.textContent = "Slow down.";
+          return;
+        }
+
+        lastPost = now;
+
+        push(commentsRef, {
+          name: name || "Anonymous",
+          text: text,
+          timestamp: now
+        });
+
+        textInput.value = "";
+        status.textContent = "Posted ✅";
+      };
+
+      // --- Moderation buttons (quotes) ---
+      if (localStorage.getItem("isAdmin") === "true") {
+        const mod = document.createElement("div");
+        mod.className = "mod-tools";
+
+        const delBtn = document.createElement("button");
+        delBtn.textContent = "🗑 Delete quote";
+        delBtn.onclick = () => {
+          if (confirm("Delete this quote?")) {
+            remove(ref(db, "quotes/" + qID));
+          }
+        };
+
+        const hideBtn = document.createElement("button");
+        hideBtn.textContent = q.hidden ? "Unhide" : "Hide";
+        hideBtn.onclick = () => {
+          update(ref(db, "quotes/" + qID), { hidden: !q.hidden });
+        };
+
+        mod.appendChild(delBtn);
+        mod.appendChild(hideBtn);
+        qDiv.appendChild(mod);
+      }
+
+      // Assemble
+      commentsBox.appendChild(commentsList);
+      commentsBox.appendChild(form);
+
+      qDiv.appendChild(toggle);
+      qDiv.appendChild(commentsBox);
+      container.appendChild(qDiv);
+    });
+  });
+
+  // --- Quick admin toggle ---
+  // In browser console: localStorage.setItem("isAdmin","true")
+</script>
+
+
+
+
+
+
+</body>
+</html>
