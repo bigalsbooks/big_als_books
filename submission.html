@@ -115,47 +115,54 @@
   <iframe title="hidden_iframe" style="display:none;"></iframe>
 
 <!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-<script>
   const firebaseConfig = {
     apiKey: "AIzaSyDTd0z-wb7mpe3r-HbU5NAokr0ROeqEwZg",
-    authDomain: "bigalsbookstore-a7c78.firebaseapp.com",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
     projectId: "bigalsbookstore-a7c78",
   };
 
-  // Initialize Firebase
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
   const form = document.getElementById("quoteForm");
-  const thanks = document.getElementById("thanks");
+  const status = document.getElementById("status");
 
-  form.addEventListener("submit", function (e) {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    status.textContent = "Submitting…";
 
     const quote  = document.getElementById("quote").value.trim();
     const book   = document.getElementById("book").value.trim();
     const author = document.getElementById("author").value.trim();
-    const name   = document.getElementById("name").value.trim() || "Anonymous";
+    const name   = document.getElementById("name").value.trim();
 
-    if (!quote || !book || !author) return;
+    if (!quote || !book || !author) {
+      status.textContent = "Missing required fields.";
+      return;
+    }
 
-    db.collection("quotes").add({
-      quote: quote,
-      book: book,
-      author: author,
-      name: name,
-      created: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(() => {
+    try {
+      await addDoc(collection(db, "quotes"), {
+        quote,
+        book,
+        author,
+        name: name || "Anonymous",
+        createdAt: serverTimestamp()
+      });
+
       form.reset();
-      thanks.style.display = "block";
-    }).catch(err => {
-      alert("Error submitting: " + err.message);
-    });
+      status.textContent = "Submitted ✅";
+    } catch (err) {
+      console.error(err);
+      status.textContent = "Error submitting.";
+    }
   });
 </script>
+
 
 </div>
     
