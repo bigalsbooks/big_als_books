@@ -62,6 +62,14 @@
       cursor: pointer;
       padding: 2px 6px;
     }
+
+    .comment-form input,
+    .comment-form textarea {
+      display: block;
+      width: 100%;
+      margin: 4px 0;
+    }
+    
   </style>
 </head>
 
@@ -139,8 +147,11 @@
           <summary>Comments</summary>
           <div class="comments" id="comments-${id}"></div>
 
+       <div class="comment-form">
           <input type="text" placeholder="Your name" id="name-${id}">
-          <br><textarea placeholder="Write a comment…" id="text-${id}"></textarea>
+          <textarea placeholder="Write a comment…" id="text-${id}"></textarea>
+         </div>
+
           <button data-id="${id}">Post</button>
         </details>
       `;
@@ -193,4 +204,5 @@
 
 </body>
 </html>
+
 
