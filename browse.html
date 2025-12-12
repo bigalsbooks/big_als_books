@@ -126,6 +126,7 @@
     return d.toLocaleDateString();
   }
 
+  // fetch all quotes
   const q = query(collection(db, "quotes"), orderBy("createdAt", "desc"));
 
   onSnapshot(q, (snapshot) => {
@@ -138,6 +139,11 @@
       const div = document.createElement("div");
       div.className = "quote-item";
 
+      // create details + summary
+      const commentsId = `comments-${id}`;
+      const nameId = `name-${id}`;
+      const textId = `text-${id}`;
+
       div.innerHTML = `
         “${escapeHTML(data.quote)}”
         <div class="quote-meta">
@@ -147,22 +153,25 @@
         </div>
 
         <details class="comments-box">
-          <summary>Comments</summary>
-          <div class="comments" id="comments-${id}"></div>
+          <summary id="summary-${id}">
+            Comments <span id="count-${id}"></span>
+          </summary>
 
-       <div class="comment-form">
-          <input type="text" placeholder="Your name" id="name-${id}">
-          <textarea placeholder="Write a comment…" id="text-${id}"></textarea>
-         </div>
+          <div class="comments" id="${commentsId}"></div>
+
+          <div class="comment-form">
+            <input type="text" placeholder="Your name" id="${nameId}">
+            <textarea placeholder="Write a comment…" id="${textId}"></textarea>
+          </div>
 
           <button data-id="${id}">Post</button>
         </details>
       `;
 
-      // comment handler
+      // comments posting
       div.querySelector("button").onclick = async () => {
-        const name = div.querySelector(`#name-${id}`).value.trim() || "Anonymous";
-        const text = div.querySelector(`#text-${id}`).value.trim();
+        const name = div.querySelector(`#${nameId}`).value.trim() || "Anonymous";
+        const text = div.querySelector(`#${textId}`).value.trim();
         if (!text) return;
 
         await addDoc(collection(db, "quotes", id, "comments"), {
@@ -171,20 +180,26 @@
           createdAt: serverTimestamp()
         });
 
-        div.querySelector(`#text-${id}`).value = "";
+        div.querySelector(`#${textId}`).value = "";
       };
 
       container.appendChild(div);
 
-      // live comments
+      // comment loader + counter
       const commentsRef = query(
         collection(db, "quotes", id, "comments"),
         orderBy("createdAt", "asc")
       );
 
-      const commentsBox = div.querySelector(`#comments-${id}`);
+      const commentsBox = div.querySelector(`#${commentsId}`);
+      const countSpan = div.querySelector(`#count-${id}`);
 
       onSnapshot(commentsRef, (snap) => {
+        // update comment count
+        const count = snap.size;
+        countSpan.textContent = count > 0 ? `${count}` : "";
+
+        // render comments
         commentsBox.innerHTML = "";
         snap.forEach((c) => {
           const com = c.data();
@@ -205,8 +220,10 @@
 
 
 
+
 </body>
 </html>
+
 
 
 
